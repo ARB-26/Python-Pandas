@@ -1,24 +1,31 @@
 # 🐼 Python Pandas: DataFrame Analysis
 
-Week 6 project from the Leep Data Technician Skills Bootcamp. Uses the pandas library to build, clean, filter, and analyse DataFrames — starting from raw Python data structures, then moving on to a real-world fuel economy dataset and a real-world biological dataset with missing values.
+Week 6 project from the Leep Data Technician Skills Bootcamp. Uses the pandas library to build, clean, filter, slice, group, and visualise DataFrames — starting from raw Python data structures, then moving through a car fuel economy dataset, a penguin biology dataset, a student marks dataset, and a country-level GDP dataset.
 
 ## 📝 Overview
 
-Three notebooks, each building on the last:
+Five notebooks, each building on the last:
 
 - Constructing DataFrames from scratch and exporting them
 - Exploring, filtering, and transforming a 234-row car fuel economy dataset (`mpg.csv`)
 - Identifying and handling missing data in a 344-row penguin measurements dataset (`penguins.csv`)
+- Slicing and filtering a 35-row student marks dataset with `.loc[]` and `.iloc[]`
+- Grouping, filling missing values, visualising, and removing outliers from a 223-country GDP per capita dataset
+
+**Note:** none of the five datasets are retail or sales data — they're inventory items, car fuel economy, penguin biology, student exam marks, and country-level GDP figures. The same pandas skills below (filtering, slicing, grouping, cleaning, visualising) transfer directly to retail/sales data, but that's not what these notebooks practiced on.
 
 ## 🧠 Skills Gained
 
-- **Creating DataFrames** – from lists of dictionaries, dictionaries of lists, and directly from a CSV file with `pd.read_csv`
+- **Creating DataFrames** – from lists of dictionaries, dictionaries of lists, a list of lists, and directly from CSV/Excel files with `pd.read_csv` / `pd.read_excel`
+- **Exploring and inspecting datasets** – `.head()`, `.tail()`, `.sample()`, `.shape`, `.info()`, `.describe()`, `.dtypes`
 - **Data cleaning and type casting** – stripping non-numeric characters from strings (e.g. `"$10.99"` → `10.99`) and converting to `float` for calculations
-- **Column creation and transformation** – building new columns from arithmetic on existing ones, including a unit conversion (MPG to miles-per-litre)
-- **Boolean filtering** – using comparison, `&` (AND), and `|` (OR) operators to filter rows, and counting/summing Boolean columns directly
-- **Sorting and ranking** – `sort_values` on one or more columns, and `nlargest`/`nsmallest`
+- **Filtering and slicing** – boolean filtering with comparison, `&` (AND), and `|` (OR) operators; label-based and position-based selection with `.loc[]` and `.iloc[]` (single cells, row/column ranges, list-based selection, and boolean-conditioned filters like `df.loc[df["mark"]>90, [...]]`); plus `.query()` and `.filter()` as alternative filtering syntax
+- **Sorting and ranking** – `.sort_values()` on one or more columns, and `.nlargest()`/`.nsmallest()`
+- **Grouping and aggregation** – `.groupby()` to compute a statistic per category, e.g. average GDP per region
 - **Aggregate statistics** – `.describe()`, `.mean()`, `.median()`, `.std()`, and `.corr()`
-- **Handling missing data** – `.isna()` to count and locate nulls by column and by row, and `.dropna()` to remove them
+- **Handling missing data** – `.isna()`/`.isnull()` to count and locate nulls, `.dropna()` to remove incomplete rows, and `.fillna()` to fill gaps with a calculated value instead of dropping them
+- **Data visualisation and outlier detection** – matplotlib and seaborn: histograms, bar charts, scatter plots, boxplots, and correlation heatmaps; using the IQR (interquartile range) method to identify and filter out outliers
+- **Column creation and transformation** – building new columns from arithmetic on existing ones, including a unit conversion (MPG to miles-per-litre) and a calculated fill value
 - **Exporting data** – `.to_csv()` and `.to_excel()`
 
 ## 🗂️ Task Breakdown
@@ -80,9 +87,54 @@ penguins.shape          # (333, 8) after
 
 Findings: the `sex` column had the most missing values (11), while the bill and flipper measurement columns each had 2. Dropping every row with any missing value reduced the dataset from 344 to 333 rows — an 11-row (3.2%) loss, small enough that dropping was a reasonable choice here rather than filling the gaps.
 
+### Task 4 — Slicing and Filtering a Student Marks Dataset with `.loc[]` and `.iloc[]`
+Loaded a 35-row dataset of student exam marks (`id`, `name`, `class`, `mark`, `gender`) and practiced label-based vs. position-based indexing, list- and range-based selection, and condition-based filtering.
+
+```python
+# iloc: position-based selection
+df.iloc[0]          # first row
+df.iloc[0:3]         # first three rows
+df.iloc[:, 1:3]      # all rows, columns 2-3
+
+# loc: label-based selection, including boolean-conditioned filtering
+df.loc[df["mark"] > 90, ["name", "class", "mark"]]
+df.loc[(df["class"] == "Seven") & (df["mark"] >= 70), ["name", "class", "mark"]]
+
+# sorting combined with filtering
+df.sort_values(by="mark", ascending=False).head().loc[df["gender"] == "female", :]
+```
+
+Findings: 17 male and 16 female students across 8 classes (two gender values were missing), with "Seven" the largest class at 10 students.
+
+### Task 5 — GroupBy, Missing Data, and Visualisation on a GDP per Capita Dataset
+Loaded a [223-country dataset of GDP per capita estimates](https://www.kaggle.com/datasets/rajkumarpandey02/gdp-in-usd-per-capita-income-by-country) from three sources (IMF, World Bank, UN), then grouped by region, filled in missing estimates, visualised distributions, and removed outliers.
+
+```python
+# Grouping and aggregating by region
+df.groupby("UN_Region")["IMF_Estimate"].mean().sort_values()
+
+# Filling missing (zero) values with a calculated average of two other columns
+df["IMF_Estimate"] = df["IMF_Estimate"].replace(0, np.nan)
+df["avg_worldbank_un"] = df[["WorldBank_Estimate", "UN_Estimate"]].mean(axis=1)
+df["IMF_Estimate"] = df["IMF_Estimate"].fillna(df["avg_worldbank_un"])
+
+# Visualising distributions and correlation
+df.hist(figsize=(10, 8))
+sns.heatmap(corr, annot=True, cmap="Purples")
+sns.barplot(x="UN_Region", y="IMF_Estimate", data=df, errorbar=None)
+
+# Removing outliers using the IQR method
+iqr = higher_q - lower_q
+upper_boundary = higher_q + 1.5 * iqr
+lower_boundary = lower_q - 1.5 * iqr
+df_filtered = df[(df["UN_Estimate"] < upper_boundary) & (df["UN_Estimate"] > lower_boundary)]
+```
+
+Findings: Europe had the highest average IMF GDP-per-capita estimate by region, and Africa the lowest. 🇱🇺 Luxembourg topped the individual IMF ranking outright, at over $132,000 per capita. Removing outliers with the IQR method dropped 27 of the 223 countries and roughly halved the average UN estimate (from ~$17,767 to ~$9,415 per capita) — showing how much a small number of very high-income countries and territories skew the overall average.
+
 ## 🛠️ Tools
 
-Python, pandas, Google Colab
+Python, pandas, NumPy, matplotlib, seaborn, Google Colab
 
 ## 🎓 About
 
